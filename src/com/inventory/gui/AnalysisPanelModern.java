@@ -1,75 +1,107 @@
 package com.inventory.gui;
 
+import com.inventory.dao.AnalysisDAO;
 import com.inventory.dao.ProductDAO;
 import com.inventory.model.Product;
 
 import javax.swing.*;
 import java.awt.*;
-import java.text.DecimalFormat;
 import java.util.List;
 
 /**
- * Simulates a stored procedure analysis with a loading bar and result
- * card.  Computes an estimate of stock depletion based on the total
- * quantity of products.  When the analysis is started a progress bar
- * animates for a short duration before the result is displayed.
+ * Analysis panel that calls a stored procedure to estimate
+ * stock depletion time per product.
  */
 public class AnalysisPanelModern extends JPanel {
-    private final ProductDAO dao = new ProductDAO();
+
+    private final ProductDAO productDAO = new ProductDAO();
+    private final AnalysisDAO analysisDAO = new AnalysisDAO();
+
+    private final JLabel statusLabel;
     private final JProgressBar progressBar;
-    private final JPanel resultCard;
-    private final JLabel resultLabel;
-    private final DecimalFormat df = new DecimalFormat("0.0");
+    private final JPanel resultPanel;
 
     public AnalysisPanelModern() {
+
         setLayout(new BorderLayout());
         setBackground(new Color(0x1e272c));
+
+        /* ---------- TOP BAR ---------- */
         JButton runBtn = new JButton("Analizi Çalıştır");
         runBtn.putClientProperty("JButton.buttonType", "roundRect");
+
         JPanel top = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         top.setOpaque(false);
         top.add(runBtn);
         add(top, BorderLayout.NORTH);
+
+        /* ---------- LOADING ---------- */
         progressBar = new JProgressBar();
         progressBar.setIndeterminate(true);
         progressBar.setVisible(false);
         add(progressBar, BorderLayout.CENTER);
-        resultCard = new JPanel();
-        resultCard.setOpaque(false);
-        resultCard.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(0x455a64)),
-                BorderFactory.createEmptyBorder(20, 20, 20, 20)));
-        resultLabel = new JLabel();
-        resultLabel.setForeground(Color.WHITE);
-        resultLabel.setFont(resultLabel.getFont().deriveFont(Font.BOLD, 18f));
-        resultCard.add(resultLabel);
-        resultCard.setVisible(false);
-        add(resultCard, BorderLayout.SOUTH);
+
+        statusLabel = new JLabel(" ");
+        statusLabel.setForeground(Color.LIGHT_GRAY);
+        statusLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        add(statusLabel, BorderLayout.SOUTH);
+
+        /* ---------- RESULT PANEL ---------- */
+        resultPanel = new JPanel();
+        resultPanel.setOpaque(false);
+        resultPanel.setLayout(new BoxLayout(resultPanel, BoxLayout.Y_AXIS));
+        resultPanel.setBorder(BorderFactory.createEmptyBorder(15, 30, 15, 30));
+        resultPanel.setVisible(false);
+        add(resultPanel, BorderLayout.EAST);
+
         runBtn.addActionListener(e -> runAnalysis());
     }
+
     private void runAnalysis() {
-        // reset UI
-        resultCard.setVisible(false);
+
+        // reset
+        resultPanel.removeAll();
+        resultPanel.setVisible(false);
+        statusLabel.setText("Yükleniyor...");
         progressBar.setVisible(true);
-        // Use Swing Timer to simulate loading for 2 seconds
-        Timer timer = new Timer(2000, e -> {
+
+        // minimal loading (1.2 sn)
+        Timer timer = new Timer(1200, e -> {
             progressBar.setVisible(false);
-            showResult();
+            statusLabel.setText("Analiz tamamlandı");
+            showResults();
         });
+
         timer.setRepeats(false);
         timer.start();
     }
-    private void showResult() {
-        List<Product> products = dao.getAllProducts();
+
+    private void showResults() {
+
+        List<Product> products = productDAO.getAllProducts();
+
         if (products.isEmpty()) {
-            resultLabel.setText("Hiç ürün yok.");
-        } else {
-            int totalQty = products.stream().mapToInt(Product::getQuantity).sum();
-            double avgDaily = totalQty / 30.0;
-            double days = totalQty / avgDaily;
-            // Equivalent to 30
-            resultLabel.setText("Tahmini Stok Bitiş Süresi: " + df.format(days) + " gün");
+            statusLabel.setText("Hiç ürün bulunamadı.");
+            return;
         }
-        resultCard.setVisible(true);
+
+        for (Product p : products) {
+
+            Integer days = analysisDAO.getStockPrediction(p.getId());
+
+            JLabel label = new JLabel(
+                    "• " + p.getName() + " → " +
+                            (days == null ? "Tahmin yok" : days + " gün")
+            );
+
+            label.setForeground(Color.WHITE);
+            label.setBorder(BorderFactory.createEmptyBorder(4, 0, 4, 0));
+
+            resultPanel.add(label);
+        }
+
+        resultPanel.setVisible(true);
+        revalidate();
+        repaint();
     }
 }
