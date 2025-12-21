@@ -6,6 +6,7 @@ import com.inventory.model.Product;
 
 import javax.swing.*;
 import javax.swing.event.ListSelectionEvent;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.List;
@@ -21,6 +22,7 @@ public class ProductPanelModern extends JPanel {
     private final JTextField searchField;
     private final JTextField nameField;
     private final JSpinner qtySpinner;
+    private final JSpinner minQtySpinner; // 🔥 sipariş eşiği
     private final JFormattedTextField priceField;
 
     // Satış (USER)
@@ -66,6 +68,13 @@ public class ProductPanelModern extends JPanel {
 
         table = new JTable(model);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+
+        DefaultTableCellRenderer center = new DefaultTableCellRenderer();
+        center.setHorizontalAlignment(SwingConstants.CENTER);
+        table.setDefaultRenderer(Object.class, center);
+        ((DefaultTableCellRenderer) table.getTableHeader()
+                .getDefaultRenderer()).setHorizontalAlignment(SwingConstants.CENTER);
+
         add(new JScrollPane(table), BorderLayout.CENTER);
 
         /* ---------- ADMIN FORM ---------- */
@@ -78,21 +87,24 @@ public class ProductPanelModern extends JPanel {
 
         gbc.gridx = 0; gbc.gridy = 0;
         formPanel.add(new JLabel("Ürün Adı"), gbc);
-
         gbc.gridx = 1;
         nameField = new JTextField(15);
         formPanel.add(nameField, gbc);
 
         gbc.gridx = 0; gbc.gridy++;
         formPanel.add(new JLabel("Stok"), gbc);
-
         gbc.gridx = 1;
         qtySpinner = new JSpinner(new SpinnerNumberModel(1, 0, 10000, 1));
         formPanel.add(qtySpinner, gbc);
 
         gbc.gridx = 0; gbc.gridy++;
-        formPanel.add(new JLabel("Fiyat"), gbc);
+        formPanel.add(new JLabel("Sipariş Eşiği"), gbc);
+        gbc.gridx = 1;
+        minQtySpinner = new JSpinner(new SpinnerNumberModel(10, 1, 10000, 1));
+        formPanel.add(minQtySpinner, gbc);
 
+        gbc.gridx = 0; gbc.gridy++;
+        formPanel.add(new JLabel("Fiyat"), gbc);
         gbc.gridx = 1;
         priceField = new JFormattedTextField(java.text.NumberFormat.getNumberInstance());
         formPanel.add(priceField, gbc);
@@ -112,7 +124,7 @@ public class ProductPanelModern extends JPanel {
 
         add(formPanel, BorderLayout.EAST);
 
-        /* ---------- SALES (USER) ---------- */
+        /* ---------- SALES ---------- */
         salePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         salePanel.setOpaque(false);
 
@@ -122,13 +134,10 @@ public class ProductPanelModern extends JPanel {
 
         sellBtn = new JButton("Satış Yap");
         salePanel.add(sellBtn);
-
         add(salePanel, BorderLayout.SOUTH);
 
-        /* ---------- LOAD ---------- */
         refreshTable(dao.getAllProducts());
 
-        /* ---------- EVENTS ---------- */
         searchBtn.addActionListener(e -> search());
         addBtn.addActionListener(e -> addProduct());
         updateBtn.addActionListener(e -> updateProduct());
@@ -150,14 +159,12 @@ public class ProductPanelModern extends JPanel {
         setAdminMode(false);
     }
 
-    /* ---------- ROLE ---------- */
     public void setAdminMode(boolean admin) {
         this.adminMode = admin;
-        formPanel.setVisible(admin);      // Admin CRUD
-        salePanel.setVisible(!admin);     // User satış
+        formPanel.setVisible(admin);
+        salePanel.setVisible(!admin);
     }
 
-    /* ---------- TABLE ---------- */
     private void refreshTable(List<Product> products) {
         model.setRowCount(0);
         for (Product p : products) {
@@ -183,12 +190,12 @@ public class ProductPanelModern extends JPanel {
         priceField.setValue(model.getValueAt(row, 3));
     }
 
-    /* ---------- ADMIN CRUD ---------- */
     private void addProduct() {
         dao.addProduct(
                 nameField.getText(),
                 (int) qtySpinner.getValue(),
-                ((Number) priceField.getValue()).doubleValue()
+                ((Number) priceField.getValue()).doubleValue(),
+                (int) minQtySpinner.getValue()
         );
         refreshTable(dao.getAllProducts());
     }
@@ -211,32 +218,14 @@ public class ProductPanelModern extends JPanel {
         refreshTable(dao.getAllProducts());
     }
 
-    /* ---------- USER SALES ---------- */
     private void sellProduct() {
-        if (selectedProductId == -1) {
-            JOptionPane.showMessageDialog(this,
-                    "Lütfen satış yapmak için tablodan bir ürün seçin.",
-                    "Uyarı",
-                    JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-
-        int qty = (int) saleSpinner.getValue();
+        if (selectedProductId == -1) return;
 
         try {
-            stockDAO.sellProduct(selectedProductId, qty);
+            stockDAO.sellProduct(selectedProductId, (int) saleSpinner.getValue());
             refreshTable(dao.getAllProducts());
-
-            JOptionPane.showMessageDialog(this,
-                    "Satış başarıyla yapıldı.\n(Stok düşürüldü, sipariş tetiklendi)",
-                    "Başarılı",
-                    JOptionPane.INFORMATION_MESSAGE);
-
         } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this,
-                    ex.getMessage(),
-                    "Hata",
-                    JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, ex.getMessage());
         }
     }
 }

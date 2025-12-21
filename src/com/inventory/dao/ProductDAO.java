@@ -7,21 +7,10 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * ProductDAO
- * ----------
- * Ürün ve stok bilgilerini veritabanından okur.
- * UI tarafına hazır Product nesneleri döndürür.
- *
- * NOT:
- * - Frontend veri üretmez
- * - String[] kullanılmaz
- * - JOIN işlemleri DAO katmanında yapılır
- */
 public class ProductDAO {
 
     /* =====================================================
-       TÜM ÜRÜNLERİ LİSTELE
+       TÜM AKTİF ÜRÜNLERİ LİSTELE
        ===================================================== */
     public List<Product> getAllProducts() {
 
@@ -34,6 +23,7 @@ public class ProductDAO {
                    p.unit_price
             FROM products p
             JOIN stock s ON p.product_id = s.product_id
+            WHERE p.is_active = TRUE
             ORDER BY p.product_id
         """;
 
@@ -58,7 +48,7 @@ public class ProductDAO {
     }
 
     /* =====================================================
-       ÜRÜN ADINA GÖRE ARAMA
+       ÜRÜN ADINA GÖRE ARAMA (SADECE AKTİFLER)
        ===================================================== */
     public List<Product> searchByName(String keyword) {
 
@@ -71,7 +61,8 @@ public class ProductDAO {
                    p.unit_price
             FROM products p
             JOIN stock s ON p.product_id = s.product_id
-            WHERE LOWER(p.name) LIKE ?
+            WHERE p.is_active = TRUE
+              AND LOWER(p.name) LIKE ?
             ORDER BY p.product_id
         """;
 
@@ -98,24 +89,20 @@ public class ProductDAO {
     }
 
     /* =====================================================
-       ÜRÜN EKLE
-       products + stock tabloları birlikte kullanılır
+       ÜRÜN EKLE (AKTİF OLARAK)
        ===================================================== */
-    public void addProduct(String name, int quantity, double price) {
+    public void addProduct(String name, int quantity, double price, int minQuantity) {
 
         String productSql =
-                "INSERT INTO products (name, unit_price) VALUES (?, ?) RETURNING product_id";
+                "INSERT INTO products (name, unit_price, is_active) VALUES (?, ?, TRUE) RETURNING product_id";
         String stockSql =
-                "INSERT INTO stock (product_id, quantity) VALUES (?, ?)";
+                "INSERT INTO stock (product_id, quantity, min_quantity) VALUES (?, ?, ?)";
 
         try (Connection conn = DbConnection.getConnection()) {
 
-            conn.setAutoCommit(false); // transaction başlat
+            conn.setAutoCommit(false);
 
-            // 1️⃣ products tablosuna ekle
-            PreparedStatement psProduct =
-                    conn.prepareStatement(productSql);
-
+            PreparedStatement psProduct = conn.prepareStatement(productSql);
             psProduct.setString(1, name);
             psProduct.setDouble(2, price);
 
@@ -123,15 +110,13 @@ public class ProductDAO {
             rs.next();
             int productId = rs.getInt(1);
 
-            // 2️⃣ stock tablosuna ekle
-            PreparedStatement psStock =
-                    conn.prepareStatement(stockSql);
-
+            PreparedStatement psStock = conn.prepareStatement(stockSql);
             psStock.setInt(1, productId);
             psStock.setInt(2, quantity);
+            psStock.setInt(3, minQuantity);
             psStock.executeUpdate();
 
-            conn.commit(); // her şey OK
+            conn.commit();
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -152,17 +137,13 @@ public class ProductDAO {
 
             conn.setAutoCommit(false);
 
-            // products
-            PreparedStatement psProduct =
-                    conn.prepareStatement(productSql);
+            PreparedStatement psProduct = conn.prepareStatement(productSql);
             psProduct.setString(1, p.getName());
             psProduct.setDouble(2, p.getPrice());
             psProduct.setInt(3, p.getId());
             psProduct.executeUpdate();
 
-            // stock
-            PreparedStatement psStock =
-                    conn.prepareStatement(stockSql);
+            PreparedStatement psStock = conn.prepareStatement(stockSql);
             psStock.setInt(1, p.getQuantity());
             psStock.setInt(2, p.getId());
             psStock.executeUpdate();
@@ -176,25 +157,51 @@ public class ProductDAO {
 
     /* =====================================================
        ÜRÜN SİL
+       KURAL:
+       - Siparişi yoksa  → GERÇEK DELETE
+       - Siparişi varsa → PASİF YAP
        ===================================================== */
     public void deleteProduct(int productId) {
 
-        String stockSql = "DELETE FROM stock WHERE product_id = ?";
-        String productSql = "DELETE FROM products WHERE product_id = ?";
+        String orderCheckSql =
+                "SELECT COUNT(*) FROM orders WHERE product_id = ?";
+        String deactivateSql =
+                "UPDATE products SET is_active = FALSE WHERE product_id = ?";
+        String stockDeleteSql =
+                "DELETE FROM stock WHERE product_id = ?";
+        String productDeleteSql =
+                "DELETE FROM products WHERE product_id = ?";
 
         try (Connection conn = DbConnection.getConnection()) {
 
             conn.setAutoCommit(false);
 
-            PreparedStatement psStock =
-                    conn.prepareStatement(stockSql);
-            psStock.setInt(1, productId);
-            psStock.executeUpdate();
+            // 1️⃣ Sipariş var mı kontrol et
+            PreparedStatement psCheck =
+                    conn.prepareStatement(orderCheckSql);
+            psCheck.setInt(1, productId);
+            ResultSet rs = psCheck.executeQuery();
+            rs.next();
+            int orderCount = rs.getInt(1);
 
-            PreparedStatement psProduct =
-                    conn.prepareStatement(productSql);
-            psProduct.setInt(1, productId);
-            psProduct.executeUpdate();
+            if (orderCount > 0) {
+                // 🔥 Siparişi varsa → PASİF
+                PreparedStatement psDeactivate =
+                        conn.prepareStatement(deactivateSql);
+                psDeactivate.setInt(1, productId);
+                psDeactivate.executeUpdate();
+            } else {
+                // 🔥 Siparişi yoksa → GERÇEK SİL
+                PreparedStatement psStock =
+                        conn.prepareStatement(stockDeleteSql);
+                psStock.setInt(1, productId);
+                psStock.executeUpdate();
+
+                PreparedStatement psProduct =
+                        conn.prepareStatement(productDeleteSql);
+                psProduct.setInt(1, productId);
+                psProduct.executeUpdate();
+            }
 
             conn.commit();
 

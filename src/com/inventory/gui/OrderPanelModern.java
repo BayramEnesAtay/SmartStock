@@ -4,6 +4,7 @@ import com.inventory.dao.OrderDAO;
 import com.inventory.model.Order;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.List;
@@ -35,6 +36,17 @@ public class OrderPanelModern extends JPanel {
         table.setRowHeight(26);
         table.setFillsViewportHeight(true);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+
+        // 🔹 Hücreleri ortala
+        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+        centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+        table.setDefaultRenderer(Object.class, centerRenderer);
+
+        // 🔹 Header'ı ortala
+        ((DefaultTableCellRenderer) table
+                .getTableHeader()
+                .getDefaultRenderer())
+                .setHorizontalAlignment(SwingConstants.CENTER);
 
         add(new JScrollPane(table), BorderLayout.CENTER);
 
