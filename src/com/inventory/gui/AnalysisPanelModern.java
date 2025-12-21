@@ -5,21 +5,26 @@ import com.inventory.dao.ProductDAO;
 import com.inventory.model.Product;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.List;
 
-/**
- * Analysis panel that calls a stored procedure to estimate
- * stock depletion time per product.
- */
 public class AnalysisPanelModern extends JPanel {
 
     private final ProductDAO productDAO = new ProductDAO();
     private final AnalysisDAO analysisDAO = new AnalysisDAO();
 
     private final JLabel statusLabel;
-    private final JProgressBar progressBar;
-    private final JPanel resultPanel;
+    private final JPanel loadingPanel;
+    private final JLabel loadingLabel;
+
+    private final JTable resultTable;
+    private final DefaultTableModel tableModel;
+    private final JScrollPane tableScroll;
+
+    private Timer loadingAnimTimer;
+    private int dotCount = 0;
 
     public AnalysisPanelModern() {
 
@@ -35,45 +40,96 @@ public class AnalysisPanelModern extends JPanel {
         top.add(runBtn);
         add(top, BorderLayout.NORTH);
 
-        /* ---------- LOADING ---------- */
-        progressBar = new JProgressBar();
-        progressBar.setIndeterminate(true);
-        progressBar.setVisible(false);
-        add(progressBar, BorderLayout.CENTER);
+        /* ---------- LOADING PANEL ---------- */
+        loadingPanel = new JPanel(new GridBagLayout());
+        loadingPanel.setOpaque(false);
 
+        loadingLabel = new JLabel("Analiz yapılıyor");
+        loadingLabel.setForeground(Color.LIGHT_GRAY);
+        loadingLabel.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        loadingPanel.add(loadingLabel);
+
+        /* ---------- STATUS ---------- */
         statusLabel = new JLabel(" ");
-        statusLabel.setForeground(Color.LIGHT_GRAY);
+        statusLabel.setForeground(Color.GRAY);
         statusLabel.setHorizontalAlignment(SwingConstants.CENTER);
         add(statusLabel, BorderLayout.SOUTH);
 
-        /* ---------- RESULT PANEL ---------- */
-        resultPanel = new JPanel();
-        resultPanel.setOpaque(false);
-        resultPanel.setLayout(new BoxLayout(resultPanel, BoxLayout.Y_AXIS));
-        resultPanel.setBorder(BorderFactory.createEmptyBorder(15, 30, 15, 30));
-        resultPanel.setVisible(false);
-        add(resultPanel, BorderLayout.EAST);
+        /* ---------- RESULT TABLE ---------- */
+        tableModel = new DefaultTableModel(
+                new Object[]{"Ürün", "Tahmini Stok Bitişi"}, 0
+        ) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+
+        resultTable = new JTable(tableModel);
+        resultTable.setRowHeight(32);
+        resultTable.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        resultTable.getTableHeader().setFont(
+                new Font("Segoe UI", Font.BOLD, 14)
+        );
+        resultTable.setFillsViewportHeight(true);
+
+        // 🔹 Hücreleri ortala
+        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+        centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+        resultTable.setDefaultRenderer(Object.class, centerRenderer);
+
+        // 🔹 Header'ı ortala
+        ((DefaultTableCellRenderer) resultTable
+                .getTableHeader()
+                .getDefaultRenderer())
+                .setHorizontalAlignment(SwingConstants.CENTER);
+
+        tableScroll = new JScrollPane(resultTable);
+        tableScroll.setBorder(BorderFactory.createEmptyBorder(15, 30, 15, 30));
 
         runBtn.addActionListener(e -> runAnalysis());
     }
 
     private void runAnalysis() {
 
-        // reset
-        resultPanel.removeAll();
-        resultPanel.setVisible(false);
-        statusLabel.setText("Yükleniyor...");
-        progressBar.setVisible(true);
+        tableModel.setRowCount(0);
+        statusLabel.setText(" ");
 
-        // minimal loading (1.2 sn)
+        remove(tableScroll);
+        add(loadingPanel, BorderLayout.CENTER);
+
+        revalidate();
+        repaint();
+
+        startLoadingAnimation();
+
         Timer timer = new Timer(1200, e -> {
-            progressBar.setVisible(false);
+            stopLoadingAnimation();
+            remove(loadingPanel);
             statusLabel.setText("Analiz tamamlandı");
             showResults();
         });
 
         timer.setRepeats(false);
         timer.start();
+    }
+
+    private void startLoadingAnimation() {
+
+        dotCount = 0;
+
+        loadingAnimTimer = new Timer(350, e -> {
+            dotCount = (dotCount + 1) % 4;
+            loadingLabel.setText("Analiz yapılıyor" + ".".repeat(dotCount));
+        });
+
+        loadingAnimTimer.start();
+    }
+
+    private void stopLoadingAnimation() {
+        if (loadingAnimTimer != null) {
+            loadingAnimTimer.stop();
+        }
     }
 
     private void showResults() {
@@ -89,18 +145,13 @@ public class AnalysisPanelModern extends JPanel {
 
             Integer days = analysisDAO.getStockPrediction(p.getId());
 
-            JLabel label = new JLabel(
-                    "• " + p.getName() + " → " +
-                            (days == null ? "Tahmin yok" : days + " gün")
-            );
-
-            label.setForeground(Color.WHITE);
-            label.setBorder(BorderFactory.createEmptyBorder(4, 0, 4, 0));
-
-            resultPanel.add(label);
+            tableModel.addRow(new Object[]{
+                    p.getName(),
+                    days == null ? "Tahmin yok" : days + " gün"
+            });
         }
 
-        resultPanel.setVisible(true);
+        add(tableScroll, BorderLayout.CENTER);
         revalidate();
         repaint();
     }
