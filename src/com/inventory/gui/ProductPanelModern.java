@@ -3,6 +3,7 @@ package com.inventory.gui;
 import com.inventory.dao.ProductDAO;
 import com.inventory.dao.StockDAO;
 import com.inventory.model.Product;
+import com.inventory.session.Session;
 
 import javax.swing.*;
 import javax.swing.event.ListSelectionEvent;
@@ -22,15 +23,13 @@ public class ProductPanelModern extends JPanel {
     private final JTextField searchField;
     private final JTextField nameField;
     private final JSpinner qtySpinner;
-    private final JSpinner minQtySpinner; // 🔥 sipariş eşiği
+    private final JSpinner minQtySpinner;
     private final JFormattedTextField priceField;
 
-    // Satış (USER)
     private final JSpinner saleSpinner;
     private final JButton sellBtn;
     private final JPanel salePanel;
 
-    // Admin CRUD
     private final JPanel formPanel;
     private final JButton addBtn;
     private final JButton updateBtn;
@@ -165,6 +164,24 @@ public class ProductPanelModern extends JPanel {
         salePanel.setVisible(!admin);
     }
 
+    /* ---------- SADECE BURASI DEĞİŞTİ ---------- */
+    private void sellProduct() {
+
+        if (selectedProductId == -1 || Session.currentUser == null) return;
+
+        try {
+            stockDAO.sellProduct(
+                    selectedProductId,
+                    (int) saleSpinner.getValue(),
+                    Session.currentUser.getUserId() // 🔥 USER ID
+            );
+            refreshTable(dao.getAllProducts());
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage());
+        }
+    }
+
+    /* ---------- DİĞER METOTLAR AYNEN ---------- */
     private void refreshTable(List<Product> products) {
         model.setRowCount(0);
         for (Product p : products) {
@@ -216,16 +233,5 @@ public class ProductPanelModern extends JPanel {
         if (selectedProductId == -1) return;
         dao.deleteProduct(selectedProductId);
         refreshTable(dao.getAllProducts());
-    }
-
-    private void sellProduct() {
-        if (selectedProductId == -1) return;
-
-        try {
-            stockDAO.sellProduct(selectedProductId, (int) saleSpinner.getValue());
-            refreshTable(dao.getAllProducts());
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage());
-        }
     }
 }
