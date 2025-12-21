@@ -135,10 +135,16 @@ public class LoginPanelModern extends JPanel {
 
         if (user != null) {
             messageLabel.setText("");
+            clearForm();
             loginSuccessHandler.accept(user);
         } else {
             messageLabel.setText("E-posta veya şifre hatalı.");
         }
+    }
+    private void clearForm(){
+        emailField.setText("");
+        passwordField.setText("");
+
     }
 
 }

@@ -151,10 +151,18 @@ public class RegisterPanelModern extends JPanel {
 
         if (!success) {
             messageLabel.setText("Bu e-posta zaten kayıtlı.");
+            clearForm();
             return;
         }
-
+        clearForm();
         messageLabel.setForeground(new Color(0x66BB6A));
         messageLabel.setText("Kayıt başarılı! Giriş yapabilirsiniz.");
+    }
+    private void clearForm()
+    {
+        nameField.setText("");
+        emailField.setText("");
+        passwordField.setText("");
+        confirmField.setText("");
     }
 }
