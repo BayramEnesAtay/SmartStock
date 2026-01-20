@@ -2,7 +2,7 @@
 
 ![Project Status](https://img.shields.io/badge/status-active-success.svg)
 ![Database](https://img.shields.io/badge/database-PostgreSQL-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
+
 
 **SmartStock** is a comprehensive **Inventory Management System** designed to streamline the process of tracking stock levels, managing product databases, and organizing supplier relationships. It provides a robust backend architecture to ensure data integrity and efficient stock control for businesses.
 
@@ -56,7 +56,7 @@ The core of SmartStock relies on a relational database design (ERD) including:
 | Category | Technology |
 |----------|------------|
 | **Database** | ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=flat&logo=postgresql&logoColor=white) |
-| **Language** | ![Java](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white) / SQL |
+| **Language** | ![Java] / SQL |
 | **Tools** | pgAdmin 4, VS Code |
 
 ---
