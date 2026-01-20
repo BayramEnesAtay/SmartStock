@@ -56,7 +56,7 @@ The core of SmartStock relies on a relational database design (ERD) including:
 | Category | Technology |
 |----------|------------|
 | **Database** | ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=flat&logo=postgresql&logoColor=white) |
-| **Language** | ![Java] / SQL |
+| **Language** | Java / SQL |
 | **Tools** | pgAdmin 4, VS Code |
 
 ---
